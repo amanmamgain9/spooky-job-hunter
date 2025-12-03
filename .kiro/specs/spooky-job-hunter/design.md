@@ -592,161 +592,157 @@ interface UIState {
 *A property is a characteristic or behavior that should hold true across all valid executions of a system-essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
 
-### Property 1: Multi-platform search execution
-*For any* set of enabled platforms and search parameters, initiating a search should execute searches on all enabled platforms simultaneously and aggregate results, continuing even if individual platforms fail.
-**Validates: Requirements 1.1, 1.3, 1.4**
+### Property 1: Multi-platform search execution with tab opening
+*For any* set of enabled platforms and search parameters, clicking the search button should open browser tabs for all enabled platforms, navigate to their search pages, execute searches simultaneously using content scripts, and aggregate results, continuing even if individual platforms fail.
+**Validates: Requirements 2.1**
 
 ### Property 2: Unified result format
-*For any* job platform and search results, parsed results should be transformed into the unified JobListing format with all required fields (title, company, location, url, platform).
-**Validates: Requirements 1.2**
+*For any* job platform and search results, parsed results should be transformed into the unified JobListing format with all required fields (title, company, location, url, platform) extracted from the DOM.
+**Validates: Requirements 2.1**
 
 ### Property 3: Deduplication consistency
 *For any* set of search results containing duplicate jobs (same title and company), the deduplication process should remove duplicates while preserving at least one instance of each unique job.
-**Validates: Requirements 1.5**
+**Validates: Requirements 2.1**
 
-### Property 4: Message passing round-trip
-*For any* message sent from popup to background or content script, the message should be received and a response should be returned successfully.
-**Validates: Requirements 1A.5**
+### Property 4: Search parameter updates
+*For any* modified search parameters, the extension should re-execute searches in the opened tabs and update results from all platforms.
+**Validates: Requirements 2.1**
 
-### Property 5: Element waiting reliability
-*For any* CSS selector and page state, the automation utility's waitForElement function should either return the element when it appears or timeout with a clear error.
-**Validates: Requirements 1A.6, 1A.8**
+### Property 5: Platform failure resilience
+*For any* platform that returns an error or is unavailable, the extension should continue searching other platforms, display an error indicator for the failed platform, and log detailed error information.
+**Validates: Requirements 2.1**
 
-### Property 6: Adapter interface validation
-*For any* object registered as a Platform Adapter, the registry should validate that it implements all required methods (search, parseResults, getJobDetails) before accepting registration.
+### Property 6: CV file validation
+*For any* uploaded file, the extension should accept it if and only if it is PDF, DOCX, or TXT format and under 5MB, rejecting all other files with an appropriate error message.
+**Validates: Requirements 1.1**
+
+### Property 7: Profile validation
+*For any* profile data, saving should succeed if and only if required fields (fullName, email) are present and valid, rejecting incomplete profiles with field-specific error messages.
+**Validates: Requirements 1.1**
+
+### Property 8: Profile persistence round-trip
+*For any* valid profile data, saving the profile to Chrome's storage API then loading it (even after simulated session restart) should return equivalent profile data.
+**Validates: Requirements 1.1**
+
+### Property 9: Profile UI reactivity
+*For any* profile field update, the UI should immediately reflect the new value without requiring page refresh or manual reload.
+**Validates: Requirements 1.1**
+
+### Property 10: CV parsing and population
+*For any* valid CV file, AI parsing should extract structured data (skills, experience, education, job titles) and populate corresponding profile fields, allowing user review and editing.
+**Validates: Requirements 1.2**
+
+### Property 11: CV parsing error handling
+*For any* CV parsing failure or low-confidence result, the extension should notify the user and allow manual entry as a fallback.
+**Validates: Requirements 1.2**
+
+### Property 12: Job search criteria persistence
+*For any* job search criteria text entered by the user, it should be saved with the profile and used in combination with CV data for relevance filtering.
+**Validates: Requirements 1.3**
+
+### Property 13: AI relevance filtering with scoring
+*For any* set of job listings and user profile with CV data and job search criteria, the relevance filter should use AI to analyze each job, assign scores (0-100), exclude jobs below threshold (default 60), and sort results by relevance in descending order within 10 seconds for up to 50 listings.
+**Validates: Requirements 2.2**
+
+### Property 14: Relevance feedback incorporation
+*For any* user feedback on a job's relevance (thumbs up/down), the extension should store the feedback and use it to adjust future filtering thresholds.
+**Validates: Requirements 2.2**
+
+### Property 15: Job result display completeness
+*For any* displayed job listing, the UI should show all required fields: title, company, location, and source platform.
 **Validates: Requirements 2.4**
 
-### Property 7: Adapter registry operations
-*For any* registered Platform Adapter, it should be retrievable from the registry by name and its enabled/disabled state should be queryable.
-**Validates: Requirements 2.5**
+### Property 16: Filter application correctness
+*For any* applied filter criteria, all displayed results should match the filter conditions (e.g., if filtering by platform, all results should be from that platform).
+**Validates: Requirements 2.4**
 
-### Property 8: CV file validation
-*For any* uploaded file, the extension should accept it if and only if it is PDF, DOCX, or TXT format and under 5MB, rejecting all other files with an appropriate error message.
-**Validates: Requirements 3.1, 3.2, 3.7**
+### Property 17: Search history management
+*For any* performed search, the search parameters should be saved to Chrome's local storage (limited to 50 most recent), retrievable later, and executable from history with the same parameters. Clearing history should remove all entries.
+**Validates: Requirements 2.6**
 
-### Property 9: Profile validation
-*For any* profile data, saving should succeed if and only if required fields (fullName, email) are present and valid, rejecting incomplete profiles with field-specific error messages.
+### Property 18: Search parameter persistence
+*For any* search parameters, saving them to Chrome's local storage then reopening the extension should restore and pre-populate the same parameters in the search form.
+**Validates: Requirements 2.6**
+
+### Property 19: Platform settings display
+*For any* supported platform (LinkedIn, Wellfound), the settings UI should display its name, logo, and current status (enabled/disabled/error).
+**Validates: Requirements 2.7**
+
+### Property 20: Platform toggle persistence
+*For any* platform, toggling its enabled state should immediately affect search behavior and persist across browser sessions using Chrome's storage API.
+**Validates: Requirements 2.7**
+
+### Property 21: Automatic platform disabling
+*For any* platform that encounters repeated errors (3 or more consecutive failures), the extension should automatically disable that platform, display an error badge, and show a notification to the user.
+**Validates: Requirements 2.7**
+
+### Property 22: Apply button navigation and detection
+*For any* job listing in search results, clicking the Apply button should use Chrome's tabs API to navigate to the job's application page in a new tab, inject a content script, and automatically detect if it's an application form page.
+**Validates: Requirements 3.1**
+
+### Property 23: Cover letter content inclusion
+*For any* job listing and user profile, the AI-generated cover letter should include references to the job title, company name, and at least one piece of profile information (CV summary, skills, or experience).
+**Validates: Requirements 3.2**
+
+### Property 24: Cover letter word limit
+*For any* generated cover letter, the word count should not exceed 500 words as enforced by the AI system prompt.
 **Validates: Requirements 3.3**
 
-### Property 10: Profile persistence round-trip
-*For any* valid profile data, saving the profile then loading it (even after simulated session restart) should return equivalent profile data.
+### Property 25: Cover letter persistence and actions
+*For any* generated cover letter, the extension should provide options to copy to clipboard, save to Chrome's local storage, or directly paste into an application form.
+**Validates: Requirements 3.2**
+
+### Property 26: Form field detection and auto-fill
+*For any* application form page, the content script should detect form fields by analyzing input elements, labels, placeholders, and name/id attributes, then automatically populate them with matching User Profile data, adding visual indicators to highlight filled fields.
 **Validates: Requirements 3.4**
 
-### Property 11: Profile UI reactivity
-*For any* profile field update, the UI should immediately reflect the new value without requiring page refresh or manual reload.
+### Property 27: File upload handling
+*For any* detected CV upload field (input type="file"), the extension should programmatically attach the user's stored CV file by creating a File object from the stored data.
+**Validates: Requirements 3.4**
+
+### Property 28: Application preview and submission
+*For any* auto-filled application form, the extension should display a side panel showing all filled information, highlight empty required fields with warnings, allow editing that updates both preview and form, and only submit upon explicit user click approval.
+**Validates: Requirements 3.5**
+
+### Property 29: Application record tracking
+*For any* submitted application, the extension should save a complete record to Chrome's local storage including job title, company, platform, job URL, submission date, status, and snapshot of all submitted form data, with support for filtering, notes, and detailed views.
 **Validates: Requirements 3.6**
 
-### Property 12: CV parsing and population
-*For any* valid CV file, parsing should extract structured data (skills, experience, education, job titles) and populate corresponding profile fields, allowing user review and editing.
-**Validates: Requirements 3A.1, 3A.2, 3A.3, 3A.5**
+### Property 30: Duplicate application detection
+*For any* job listing, if the job URL or job title+company combination matches an existing application record, the extension should display a clear "Already Applied" badge and show a warning modal with previous application details before allowing reapplication.
+**Validates: Requirements 3.6**
 
-### Property 13: CV parsing error handling
-*For any* CV parsing failure or low-confidence result, the extension should notify the user and allow manual entry as a fallback.
-**Validates: Requirements 3A.4**
+### Property 31: Question similarity matching and suggestion
+*For any* custom application question detected by analyzing form field labels, the extension should query the stored question database using text similarity (80%+ threshold), display previous answers in a suggestion tooltip, and allow users to edit or reject suggestions.
+**Validates: Requirements 3.7**
 
-### Property 14: Job search criteria persistence
-*For any* job search criteria text entered by the user, it should be saved with the profile and used in combination with CV data for relevance filtering.
-**Validates: Requirements 3B.2, 3B.3, 3B.4**
+### Property 32: Question database persistence
+*For any* answered custom question, the question text, answer, and timestamp should be saved to Chrome's local storage with a searchable management interface in settings.
+**Validates: Requirements 3.7**
 
-### Property 15: Dynamic field registration
-*For any* new profile field added to the schema, the field should be included in serialization, validation, and UI form generation automatically.
-**Validates: Requirements 4.1, 4.2, 4.3**
+### Property 33: CAPTCHA handling
+*For any* detected CAPTCHA (by searching for common CAPTCHA iframe elements, reCAPTCHA divs, or hCaptcha elements), the extension should pause auto-fill, highlight the CAPTCHA with a pulsing border, notify the user, and automatically resume after CAPTCHA completion without attempting to bypass.
+**Validates: Requirements 3.8**
 
-### Property 16: Field-specific validation
-*For any* profile field with a validation rule, submitting invalid data for that field should trigger the field's specific validation error.
-**Validates: Requirements 4.4**
+### Property 34: Authentication handling
+*For any* application requiring authentication (detected by checking for login forms, authentication redirects, or "sign in" buttons), the extension should pause the process, display a notification banner, instruct the user to log in, and automatically resume after authentication completion without storing credentials.
+**Validates: Requirements 3.9**
 
-### Property 17: Cover letter content inclusion
-*For any* job listing and user profile, the generated cover letter should include references to the job title, company name, and at least one piece of profile information.
-**Validates: Requirements 5.1, 11.2**
+### Property 35: Halloween theme consistency
+*For any* UI element, the React UI should use the Halloween color palette (purples #6B46C1, oranges #F97316, blacks #1F2937) with minimum 4.5:1 contrast ratios, include Halloween-themed SVG icons, and use smooth CSS animations (0.3s ease-in-out).
+**Validates: Requirements 4.1**
 
-### Property 18: Cover letter word limit
-*For any* generated cover letter, the word count should not exceed 500 words.
-**Validates: Requirements 11.5**
-
-### Property 19: Cover letter persistence
-*For any* generated cover letter, saving it should allow retrieval of the same content later.
-**Validates: Requirements 5.5**
-
-### Property 20: Job result display completeness
-*For any* displayed job listing, the UI should show all required fields: title, company, location, and source platform.
-**Validates: Requirements 8.1**
-
-### Property 21: Filter application correctness
-*For any* applied filter criteria, all displayed results should match the filter conditions (e.g., if filtering by "Remote", all results should be remote jobs).
-**Validates: Requirements 8.2**
-
-### Property 22: AI relevance filtering
-*For any* set of job listings and user profile with CV data and job search criteria, the relevance filter should analyze each job, assign scores, exclude irrelevant jobs, and sort results by relevance within 10 seconds for up to 50 listings.
-**Validates: Requirements 8A.1, 8A.2, 8A.3, 8A.4, 8A.6**
-
-### Property 23: Search history management
-*For any* performed search, the search parameters should be saved to history, retrievable later, and executable from history with the same parameters. Clearing history should remove all entries.
-**Validates: Requirements 9.1, 9.3, 9.4, 9.5**
-
-### Property 24: Search parameter persistence
-*For any* search parameters, saving them then reopening the extension should restore the same parameters.
-**Validates: Requirements 9.2**
-
-### Property 25: Platform settings display
-*For any* registered platform, the settings UI should display its name, logo, and current status (enabled/disabled/error).
-**Validates: Requirements 10.1, 10.2**
-
-### Property 26: Platform toggle persistence
-*For any* platform, toggling its enabled state should immediately affect search behavior and persist across browser sessions.
-**Validates: Requirements 10.3, 10.4**
-
-### Property 27: Automatic platform disabling
-*For any* platform adapter that encounters repeated errors (3+ consecutive failures), the extension should automatically disable that platform and notify the user.
-**Validates: Requirements 10.5**
-
-### Property 28: Apply button navigation
-*For any* job listing in search results, clicking the Apply button should navigate to the job's application page and automatically detect if it's an application form.
-**Validates: Requirements 12A.2, 12A.3, 12A.4**
-
-### Property 29: Form field detection and auto-fill
-*For any* application form page, the extension should detect form fields and automatically populate them with matching profile and CV data, highlighting filled fields.
-**Validates: Requirements 13.1, 13.2, 13.3, 13.4, 13.5, 13.6**
-
-### Property 30: Application preview and submission
-*For any* auto-filled application form, the extension should display a preview with all filled information, highlight empty required fields, allow editing, and only submit upon user approval.
-**Validates: Requirements 14.1, 14.2, 14.3, 14.5**
-
-### Property 31: Application record tracking
-*For any* submitted application, the extension should save a complete record with job details, submission date, status, and submitted answers, and allow filtering and note-taking.
-**Validates: Requirements 3.6.1, 3.6.2, 3.6.3, 3.6.4, 3.6.5**
-
-### Property 31A: Duplicate application detection
-*For any* job listing, if the user has previously applied to that job (matching company and title), the extension should display a clear indicator and warn the user before allowing reapplication.
-**Validates: Requirements 3.6.6, 3.6.7**
-
-### Property 32: Question similarity matching and suggestion
-*For any* custom application question, the extension should check for similar previously-answered questions using AI, suggest previous answers when found, and allow users to edit or reject suggestions.
-**Validates: Requirements 16.1, 16.2, 16.4, 16.5**
-
-### Property 33: Question database persistence
-*For any* answered custom question, the question text and answer should be saved to a searchable database for future use.
-**Validates: Requirements 16.3, 16.6**
-
-### Property 34: CAPTCHA handling
-*For any* detected CAPTCHA on an application form, the extension should pause auto-fill, highlight the CAPTCHA, notify the user, and resume after user completion without attempting to bypass.
-**Validates: Requirements 17.1, 17.2, 17.3, 17.4**
-
-### Property 35: Authentication handling
-*For any* application requiring authentication, the extension should detect the requirement, pause the process, notify the user with instructions, resume after user login, and never store credentials.
-**Validates: Requirements 18.1, 18.2, 18.3, 18.4, 18.5**
-
-### Property 36: Error resilience
-*For any* component error (platform adapter failure, network loss, cover letter generation error), the extension should continue operating with other components, display a themed error message, preserve user input, and log the error to console.
-**Validates: Requirements 19.1, 19.2, 19.3, 19.4, 19.5**
+### Property 36: React UI responsiveness
+*For any* user interaction, the React UI should display within 1 second when clicking the extension icon, provide tab-based navigation, display real-time status updates from the background service worker, and be functional at standard popup dimensions (400px width, 600px height).
+**Validates: Requirements 4.2**
 
 ### Property 37: UI state restoration
-*For any* UI view state, closing and reopening the popup should restore the user to the same view.
-**Validates: Requirements 7.5**
+*For any* UI view state (active tab, scroll position), closing and reopening the popup should restore the user's previous state by loading from Chrome's session storage.
+**Validates: Requirements 4.2**
 
-### Property 38: Interactive feedback
-*For any* user interaction with UI elements (clicks, hovers), the UI should provide visual feedback (animations, effects).
-**Validates: Requirements 6.5**
+### Property 38: Error resilience with themed messaging
+*For any* component error (platform failure, network loss, cover letter generation error), the extension should continue operating with other components, display a Halloween-themed error message with spooky icons, preserve user input, provide retry options, and log detailed errors to console.
+**Validates: Requirements 4.4**
 
 ## Error Handling
 
