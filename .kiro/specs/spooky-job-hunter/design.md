@@ -2,14 +2,14 @@
 
 ## Overview
 
-The Spooky Job Hunter is a Chrome Manifest V3 extension that automates the entire job search and application process across multiple platforms using a modular, extensible architecture. The system consists of four main layers:
+The Spooky Job Hunter is a Chrome Manifest V3 extension that automates the entire job search and application process across multiple platforms using a distributed, tab-based architecture. The system consists of four main layers:
 
 1. **Presentation Layer**: React-based popup UI with Halloween theming
-2. **Business Logic Layer**: Platform adapters, search orchestration, profile management, AI integration, and application automation
-3. **Data Layer**: Application tracking, question memory, and user profile storage
-4. **Infrastructure Layer**: Chrome extension APIs, content scripts, storage, and messaging
+2. **Coordination Layer**: Background service worker that coordinates tab opening, message passing, and result aggregation
+3. **Execution Layer**: Content scripts injected into job platform tabs that perform actual searching, scraping, and form filling
+4. **Data Layer**: Profile storage, application tracking, question memory, and AI services
 
-The extension uses content scripts to interact with job platform websites, extracting job listings through DOM manipulation, auto-filling application forms, and managing the entire application workflow. AI integration provides CV parsing, job relevance filtering, cover letter generation, and intelligent question matching.
+**Key Architectural Principle**: Each job platform runs independently in its own browser tab with an injected content script (platform adapter). The background service worker acts as a lightweight coordinator that opens tabs, passes messages, aggregates results, and manages data - but the actual work of navigating, searching, and scraping happens in the content scripts running in each platform's tab.
 
 ## Architecture
 
@@ -23,8 +23,7 @@ graph TB
     end
     
     subgraph "Background Service Worker"
-        Orchestrator[Search Orchestrator]
-        Registry[Platform Registry]
+        Coordinator[Search Coordinator]
         ProfileMgr[Profile Manager]
         CVParser[CV Parser]
         RelevanceFilter[Relevance Filter]
@@ -34,40 +33,56 @@ graph TB
         StorageMgr[Storage Manager]
     end
     
-    subgraph "Content Scripts"
-        LinkedIn[LinkedIn Adapter]
-        Wellfound[Wellfound Adapter]
+    subgraph "LinkedIn Tab"
+        LinkedInAdapter[LinkedIn Adapter]
+        LinkedInUtils[Automation Utils]
+    end
+    
+    subgraph "Wellfound Tab"
+        WellfoundAdapter[Wellfound Adapter]
+        WellfoundUtils[Automation Utils]
+    end
+    
+    subgraph "Application Tab"
         FormFiller[Form Auto-filler]
-        Utils[Automation Utils]
+        FormUtils[Automation Utils]
     end
     
     subgraph "External Services"
         OpenAI[OpenAI API]
-        JobSites[Job Platform Websites]
     end
     
-    UI <-->|Chrome Messages| Orchestrator
-    Orchestrator --> Registry
-    Orchestrator --> ProfileMgr
-    Orchestrator --> RelevanceFilter
-    Orchestrator --> CoverLetterGen
-    Orchestrator --> AppManager
+    subgraph "Job Platform Websites"
+        LinkedInSite[LinkedIn.com]
+        WellfoundSite[Wellfound.com]
+        AppSite[Application Pages]
+    end
+    
+    UI -->|1. User clicks search| Coordinator
+    Coordinator -->|2. Open tabs & inject scripts| LinkedInAdapter
+    Coordinator -->|2. Open tabs & inject scripts| WellfoundAdapter
+    LinkedInAdapter -->|3. Navigate & scrape| LinkedInSite
+    WellfoundAdapter -->|3. Navigate & scrape| WellfoundSite
+    LinkedInAdapter -->|4. Send results| Coordinator
+    WellfoundAdapter -->|4. Send results| Coordinator
+    Coordinator -->|5. Aggregate & filter| RelevanceFilter
+    RelevanceFilter -->|6. Return filtered jobs| UI
+    
+    UI -->|Apply to job| Coordinator
+    Coordinator -->|Open application page| FormFiller
+    FormFiller -->|Auto-fill form| AppSite
+    FormFiller -->|Get suggestions| QuestionDB
+    FormFiller -->|Submit| AppManager
+    
     ProfileMgr --> CVParser
-    Registry --> LinkedIn
-    Registry --> Wellfound
-    LinkedIn --> Utils
-    Wellfound --> Utils
-    FormFiller --> Utils
-    LinkedIn <--> JobSites
-    Wellfound <--> JobSites
-    FormFiller <--> JobSites
     CVParser --> OpenAI
     RelevanceFilter --> OpenAI
     CoverLetterGen --> OpenAI
-    AppManager --> QuestionDB
+    QuestionDB --> OpenAI
+    
     ProfileMgr --> StorageMgr
-    Orchestrator --> StorageMgr
     AppManager --> StorageMgr
+    QuestionDB --> StorageMgr
 ```
 
 ### Extension Structure
@@ -92,25 +107,23 @@ spooky-job-hunter/
 │   │   ├── theme/
 │   │   │   └── spookyTheme.ts
 │   │   └── index.tsx
-│   ├── background/               # Service worker
-│   │   ├── service-worker.ts
-│   │   ├── orchestrator.ts
-│   │   ├── platform-registry.ts
-│   │   ├── profile-manager.ts
-│   │   ├── cv-parser.ts
-│   │   ├── relevance-filter.ts
-│   │   ├── cover-letter-generator.ts
-│   │   ├── application-manager.ts
-│   │   ├── question-database.ts
-│   │   └── storage-manager.ts
-│   ├── content/                  # Content scripts
+│   ├── background/               # Service worker (coordinator)
+│   │   ├── service-worker.ts     # Main entry point
+│   │   ├── search-coordinator.ts # Opens tabs, aggregates results
+│   │   ├── profile-manager.ts    # Manages user profile
+│   │   ├── cv-parser.ts          # AI CV parsing
+│   │   ├── relevance-filter.ts   # AI job filtering
+│   │   ├── cover-letter-generator.ts # AI cover letter generation
+│   │   ├── application-manager.ts # Application tracking
+│   │   ├── question-database.ts  # Question/answer memory
+│   │   └── storage-manager.ts    # Chrome storage wrapper
+│   ├── content/                  # Content scripts (injected into tabs)
 │   │   ├── platform-adapters/
-│   │   │   ├── base-adapter.ts
-│   │   │   ├── linkedin-adapter.ts
-│   │   │   └── wellfound-adapter.ts
-│   │   ├── form-filler.ts
+│   │   │   ├── linkedin-adapter.ts    # Runs in LinkedIn tab
+│   │   │   └── wellfound-adapter.ts   # Runs in Wellfound tab
+│   │   ├── form-filler.ts        # Runs in application page tabs
 │   │   └── utils/
-│   │       └── automation-utils.ts
+│   │       └── automation-utils.ts # DOM helpers
 │   ├── shared/                   # Shared types and utilities
 │   │   ├── types.ts
 │   │   ├── messages.ts
@@ -121,35 +134,64 @@ spooky-job-hunter/
     └── index.html
 ```
 
+### Search Flow
+
+The job search process follows this distributed flow:
+
+1. **User initiates search** in popup UI
+2. **Popup sends message** to background service worker with search parameters
+3. **Background coordinator**:
+   - Checks which platforms are enabled
+   - Opens a new tab for each enabled platform using Chrome tabs API
+   - Injects the appropriate platform adapter content script into each tab
+   - Sends search parameters to each content script
+4. **Content scripts (platform adapters)** in each tab:
+   - Navigate to the platform's search page
+   - Fill in search forms using automation utils
+   - Wait for results to load (MutationObserver/polling)
+   - Parse job listings from DOM using CSS selectors
+   - Send results back to background coordinator
+5. **Background coordinator**:
+   - Aggregates results from all platforms
+   - Deduplicates jobs
+   - Sends to relevance filter for AI scoring
+   - Returns filtered, sorted results to popup
+6. **Popup displays results** to user
+
+This architecture keeps the background service worker lightweight and distributes the actual work across content scripts running in platform tabs.
+
 ## Components and Interfaces
 
 ### Platform Adapter Interface
 
-The core abstraction for job platform integration:
+Platform adapters are content scripts injected into job platform tabs. Each adapter runs independently in its own tab and communicates with the background coordinator via Chrome message passing.
 
 ```typescript
 interface PlatformAdapter {
   readonly name: string;
   readonly platformUrl: string;
-  readonly enabled: boolean;
   
-  // Initialize the adapter with configuration
-  initialize(config: AdapterConfig): Promise<void>;
+  // Initialize the adapter when injected into a tab
+  initialize(): Promise<void>;
   
-  // Execute a job search
+  // Execute a job search on this platform
+  // This runs in the platform's tab and manipulates the DOM
   search(params: SearchParams): Promise<SearchResult>;
   
-  // Parse job listings from the current page
+  // Parse job listings from the current page DOM
   parseResults(): Promise<JobListing[]>;
   
-  // Get detailed information for a specific job
-  getJobDetails(jobId: string): Promise<JobDetails>;
+  // Navigate to and parse a specific job's details
+  getJobDetails(jobUrl: string): Promise<JobDetails>;
   
-  // Check if the adapter is on a valid platform page
+  // Check if currently on a valid platform page
   isOnPlatformPage(): boolean;
   
   // Check if on an application page
   isOnApplicationPage(): boolean;
+  
+  // Listen for messages from background coordinator
+  setupMessageListener(): void;
 }
 
 interface SearchParams {
@@ -498,33 +540,81 @@ interface CoverLetter {
 }
 ```
 
+### Search Coordinator
+
+The background service worker component that coordinates the search process:
+
+```typescript
+interface SearchCoordinator {
+  // Initiate a multi-platform search
+  // Opens tabs, injects scripts, aggregates results
+  startSearch(params: SearchParams): Promise<AggregatedResults>;
+  
+  // Get list of enabled platforms
+  getEnabledPlatforms(): string[];
+  
+  // Open a tab for a specific platform and inject adapter
+  openPlatformTab(platform: string, params: SearchParams): Promise<number>; // returns tabId
+  
+  // Handle results from a platform adapter
+  handlePlatformResults(tabId: number, results: SearchResult): void;
+  
+  // Aggregate and deduplicate results from all platforms
+  aggregateResults(): AggregatedResults;
+  
+  // Close platform tabs after search completes
+  closePlatformTabs(): Promise<void>;
+}
+
+interface AggregatedResults {
+  jobs: JobListing[];
+  platformResults: Record<string, SearchResult>;
+  errors: Record<string, string>;
+  totalCount: number;
+}
+```
+
 ### Message Passing
 
 Communication between popup, background, and content scripts:
 
 ```typescript
 type MessageType =
+  // Popup -> Background
   | 'SEARCH_JOBS'
-  | 'GET_RESULTS'
   | 'SAVE_PROFILE'
   | 'LOAD_PROFILE'
   | 'PARSE_CV'
-  | 'FILTER_JOBS'
   | 'GENERATE_COVER_LETTER'
+  | 'GET_APPLICATION_HISTORY'
+  | 'TOGGLE_PLATFORM'
+  | 'GET_PLATFORM_STATUS'
+  
+  // Background -> Content Script (Platform Adapter)
+  | 'START_PLATFORM_SEARCH'
+  | 'GET_JOB_DETAILS'
+  
+  // Content Script -> Background
+  | 'PLATFORM_RESULTS'
+  | 'PLATFORM_ERROR'
+  
+  // Background -> Content Script (Form Filler)
   | 'DETECT_FORM'
   | 'FILL_FORM'
-  | 'PREVIEW_APPLICATION'
   | 'SUBMIT_APPLICATION'
-  | 'GET_APPLICATION_HISTORY'
+  
+  // Content Script -> Background
+  | 'FORM_DETECTED'
+  | 'FORM_FILLED'
+  | 'APPLICATION_SUBMITTED'
   | 'FIND_SIMILAR_QUESTIONS'
-  | 'SAVE_QUESTION_ANSWER'
-  | 'TOGGLE_PLATFORM'
-  | 'GET_PLATFORM_STATUS';
+  | 'SAVE_QUESTION_ANSWER';
 
 interface Message<T = any> {
   type: MessageType;
   payload?: T;
   requestId: string;
+  tabId?: number; // For routing to specific tabs
 }
 
 interface MessageResponse<T = any> {
